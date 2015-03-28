@@ -1,31 +1,5 @@
-/*
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package queue;
 
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.io.Serializable;
-import java.util.AbstractCollection;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.NoSuchElementException;
-import java.util.Queue;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
@@ -35,41 +9,35 @@ import java.util.concurrent.locks.ReentrantLock;
  * replaces its oldest element if full.
  * <p>
  * The removal order of a {@link CircularFifoQueue} is based on the insertion
- * order; elements are removed in the same order in which they were added. The
- * iteration order is the same as the removal order.
+ * order; elements are removed in the same order in which they were added.
  * <p>
- * The {@link #add(Object)}, {@link #remove()}, {@link #peek()}, {@link #poll},
- * {@link #offer(Object)} operations all perform in constant time. All other
- * operations perform in linear time or worse.
+ * The {@link #put(Object)} operations all perform in constant time and always
+ * success because the queue is circular.
  * <p>
- * This queue prevents null objects from being added.
+ * <p>
+ * The {@link #take()} operations will block if the queue is empty
+ * <p>
  *
- * @since 4.0
- * @version $Id: CircularFifoQueue.java 1543246 2013-11-19 00:36:29Z ggregory $
+ */
+/**
+ * <pre>
+ * 唉 写的不对 ArrayBlockingQueue都只能用一个大lock 我想实现remove
+ * oldest，比ArrayBlockingQueue复杂，更加要用一个大lock 想用2个lock 会遇到种种问题 Goug Lee真牛
+ * </pre>
  */
 public class CircularFifoQueue<E> {
 
 	private E[] elements;
 
-	private AtomicInteger putIndex = new AtomicInteger(-1);
+	private AtomicInteger putIndex = new AtomicInteger(0);
 
-	private AtomicInteger pollIndex = new AtomicInteger(0);
+	private AtomicInteger takeIndex = new AtomicInteger(0);
 
-	/** Lock held by take, poll, etc */
 	private final ReentrantLock takeLock = new ReentrantLock();
 
-	/** Wait queue for waiting takes */
 	private final Condition notEmpty = takeLock.newCondition();
 
-	private void signalNotEmpty() {
-		final ReentrantLock takeLock = this.takeLock;
-		takeLock.lock();
-		try {
-			notEmpty.signal();
-		} finally {
-			takeLock.unlock();
-		}
-	}
+	private final ReentrantLock putLock = new ReentrantLock();
 
 	public CircularFifoQueue() {
 		this(32);
@@ -81,27 +49,73 @@ public class CircularFifoQueue<E> {
 			throw new IllegalArgumentException(
 					"The size must be greater than 0");
 		}
-		elements = (E[]) new Object[size];
+		elements = (E[]) new Object[size + 1];// 比实际容量多1。putIndex在taskIndex前面一个时，就算full。
 	}
 
-	public void put(E e) {
-		int index = putIndex.incrementAndGet() % elements.length;
-		elements[index] = e;
-		if(index == ){
+	public void put(E e) throws InterruptedException {
+		final ReentrantLock putLock = this.putLock;
+		putLock.lockInterruptibly();
+		boolean isEmpty = false;
+		try {
+			int tIndex = takeIndex.get();
+			if (tIndex == index(putIndex.get() + 1)) {// if full，takeIndex++
+				takeIndex.compareAndSet(tIndex, index(tIndex + 1));
+			}
+			// not full, put element
+			elements[index(putIndex.get())] = e;
+
+			if (isEmpty()) {// empty
+				isEmpty = true;
+			}
+			putIndex.incrementAndGet();
+		} finally {
+			putLock.unlock();
+		}
+		if (isEmpty) {
 			signalNotEmpty();
 		}
 	}
 
-	public E poll() throws InterruptedException {
-		this.takeLock.lockInterruptibly();
+	public boolean isEmpty() {
+		return takeIndex.get() == putIndex.get();
+	}
+
+	public E take() throws InterruptedException {
+		final ReentrantLock takeLock = this.takeLock;
+		takeLock.lockInterruptibly();
 		try {
-			while(pollIndex == putIndex){//empty
-				notEmpty.wait();
+			while (isEmpty()) {// empty
+				notEmpty.await();
 			}
-			return elements[pollIndex.getAndIncrement() % elements.length];
+			E ele = elements[index(takeIndex.getAndIncrement())];
+
+			if (!isEmpty()) {// not empty
+				signalNotEmpty();
+			}
+
+			return ele;
 		} finally {
-			this.takeLock.unlock();
+			takeLock.unlock();
 		}
+	}
+
+	private int index(int idx) {
+		return idx % elements.length;
+	}
+
+	private void signalNotEmpty() {
+		final ReentrantLock takeLock = this.takeLock;
+		takeLock.lock();
+		try {
+			notEmpty.signal();
+		} finally {
+			takeLock.unlock();
+		}
+	}
+
+	public int size() {
+		return (putIndex.get() - takeIndex.get() + elements.length)
+				% elements.length;
 	}
 
 }
