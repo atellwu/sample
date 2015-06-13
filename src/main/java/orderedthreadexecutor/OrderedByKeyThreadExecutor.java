@@ -84,7 +84,8 @@ public class OrderedByKeyThreadExecutor extends ThreadPoolExecutor {
 
 			// 1. 如果map已经存在相同key的对象，则尝试链接上它的next
 			if (absentWrapRunnable != null) {
-				// 能链接上next，就不管了；不能链接上，则说明next已经为END，即该链已断，不会再被调用，那么需要重新调用
+				// 能链接上next，就不管了：能连上，该task的执行，就交给链表上游的task去触发执行
+				//不能链接上，则说明next已经为END，即该链已断，不会再被调用，那么需要重新调用
 				if (!compareAndSetNext(absentWrapRunnable, null, wrapRunnable)) {
 					super.execute(wrapRunnable);
 				}
