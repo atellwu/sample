@@ -14,7 +14,7 @@ import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
  * 为了说明不公平，假设executor只用一个线程：
  * 比如事件发生的顺序是：     channel-1，channel-2，channel-1，channel-1
  * 最终执行的顺序很可能是： channel-1，channel-1，channel-1，channel-2
- * 
+ * 不公平的缺点：channel-1的事件来的频繁的话 可能导致channel-2迟迟得不到执行
  * 因为它的实现里，相同channel追加时，可能会延长该channel的run的时间，和lock的不公平有类似。
  * 
  * 这里，实现同样的功能：相同key，串行执行。特点是：无锁化(除了map)，考虑了公平性（关键点在于，追加某个key的任务时，不会导致任务的run变长，
