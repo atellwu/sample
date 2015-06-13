@@ -72,20 +72,24 @@ public class OrderedByKeyThreadExecutor extends ThreadPoolExecutor {
 
 			// 直接放到map里(后入的放在key上， 如果插入顺序是 A,B,C ，那么map里该key的情况是 key--->
 			// C->B->A)
-			//把队尾放在map里，每次建立next的链接，不需要遍历这条链， 拿key上的runnable.next指向即可
-			
-			//“链表”这块实现的对比：
-			//1. netty的OrderedMemoryAwareThreadPoolExecutor使用putIfAbsent因为它一个key只需要一个ChildExecutor，ChildExecutor里才是一个LinkList
-			//execute和run都会访问这个“链表”，netty在对LinkList，需要使用syncrnized
-			//2. 而我的实现，在execute修改“链表”和run里面访问“链表”时，都不会出现问题，多亏map.put支持并发(原子)并且能返回旧值，另外对next的修改使用cas。
+			// 把队尾放在map里，每次建立next的链接，不需要遍历这条链， 拿key上的runnable.next指向即可
 
+			// “链表”这块实现的对比：
+			// 1.
+			// netty的OrderedMemoryAwareThreadPoolExecutor使用putIfAbsent因为它一个key只需要一个ChildExecutor，ChildExecutor里才是一个LinkList
+			// execute和run都会访问这个“链表”，netty在对LinkList，需要使用syncrnized
+			// 2.
+			// 而我的实现，在execute修改“链表”和run里面访问“链表”时，都不会出现问题，多亏map.put支持并发(原子)并且能返回旧值，另外对next的修改使用cas。
+
+			// 该操作返回的是旧值，能保证，即使并发访问execute，也不会并发出现同一个absentWrapRunnable对象，
+			//所以下方对它的next修改，只需考虑run里面可能有其他线程正在访问它的next，借助END对象和cas，即可处理
 			WrapRunnable absentWrapRunnable = map.put(runnableWithKey.getKey(),
 					wrapRunnable);
 
 			// 1. 如果map已经存在相同key的对象，则尝试链接上它的next
 			if (absentWrapRunnable != null) {
 				// 能链接上next，就不管了：能连上，该task的执行，就交给链表上游的task去触发执行
-				//不能链接上，则说明next已经为END，即该链已断，不会再被调用，那么需要重新调用
+				// 不能链接上，则说明next已经为END，即该链已断，不会再被调用，那么需要重新调用
 				if (!compareAndSetNext(absentWrapRunnable, null, wrapRunnable)) {
 					super.execute(wrapRunnable);
 				}
