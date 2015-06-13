@@ -72,6 +72,13 @@ public class OrderedByKeyThreadExecutor extends ThreadPoolExecutor {
 
 			// 直接放到map里(后入的放在key上， 如果插入顺序是 A,B,C ，那么map里该key的情况是 key--->
 			// C->B->A)
+			//把队尾放在map里，每次建立next的链接，不需要遍历这条链， 拿key上的runnable.next指向即可
+			
+			//“链表”这块实现的对比：
+			//1. netty的OrderedMemoryAwareThreadPoolExecutor使用putIfAbsent因为它一个key只需要一个ChildExecutor，ChildExecutor里才是一个LinkList
+			//execute和run都会访问这个“链表”，netty在对LinkList，需要使用syncrnized
+			//2. 而我的实现，在execute修改“链表”和run里面访问“链表”时，都不会出现问题，多亏map.put支持并发(原子)并且能返回旧值，另外对next的修改使用cas。
+
 			WrapRunnable absentWrapRunnable = map.put(runnableWithKey.getKey(),
 					wrapRunnable);
 
