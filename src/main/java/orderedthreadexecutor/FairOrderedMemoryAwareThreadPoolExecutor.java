@@ -28,10 +28,41 @@ import org.jboss.netty.handler.execution.ChannelEventRunnable;
 import org.jboss.netty.handler.execution.MemoryAwareThreadPoolExecutor;
 import org.jboss.netty.util.ObjectSizeEstimator;
 
+/**
+ * <pre>
+ * This is a <b>fair</b> alternative of OrderedMemoryAwareThreadPoolExecutor.
+ * 
+ * <h3>Unfair of OrderedMemoryAwareThreadPoolExecutor</h3>
+ * The task executed in OrderedMemoryAwareThreadPoolExecutor is unfair in some situations.
+ * For example, let's say there is only one executor thread that handle the events from the two channels, and events are submitted in sequence:
+ * 
+ *           Channel A (Event A1) , Channel B (Event B), Channel A (Event A2) , ... , Channel A (Event An)
+ * 
+ * Then the events maybe executed in this unfair order:
+ * 
+ *          ----------------------------------------------------&gt; Timeline ------------------------------------------------------&gt;
+ *           Channel A (Event A1) , Channel A (Event A2) , ... , Channel A (Event An), Channel B (Event B)
+ * 
+ *  As we see above, Channel B (Event B) maybe executed unfairly late.
+ *  Even more, if there are too much events come in Channel A, and one-by-one closely, then Channel B (Event B) would be waiting for a long while and become "hungry".
+ * 
+ * <h3>Fair of FairOrderedMemoryAwareThreadPoolExecutor</h3>
+ * In the same case above ( one executor thread and two channels ) , this implement will guarantee execution order as:
+ * 
+ *          ----------------------------------------------------&gt; Timeline ------------------------------------------------------&gt;
+ *           Channel A (Event A1) , Channel B (Event B), Channel A (Event A2) , ... , Channel A (Event An),
+ * 
+ * </pre>
+ *  <b>NOTE</b>:  For convenience the case above use <b>one single executor thread</b>, but the fair mechanism is suitable for <b>multiple executor threads</b> situations.
+ * 
+ * @author atell.wu
+ *
+ */
 public class FairOrderedMemoryAwareThreadPoolExecutor extends
 		MemoryAwareThreadPoolExecutor {
 
-	private final EventTask END = new EventTask(null);// next断开时赋值END
+	//end sign
+	private final EventTask END = new EventTask(null);
 
 	private final AtomicReferenceFieldUpdater<EventTask, EventTask> fieldUpdater = AtomicReferenceFieldUpdater
 			.newUpdater(EventTask.class, EventTask.class, "next");
@@ -142,23 +173,9 @@ public class FairOrderedMemoryAwareThreadPoolExecutor extends
 			ChannelEventRunnable eventRunnable = (ChannelEventRunnable) task;
 			EventTask newEventTask = new EventTask(eventRunnable);
 
-			// 直接放到map里(后入的放在key上， 如果插入顺序是 A,B,C ，那么map里该key的情况是 key--->
-			// C->B->A)
-			// 把队尾放在map里，每次建立next的链接，不需要遍历这条链， 拿key上的runnable.next指向即可
-
-			// “链表”这块实现的对比：
-			// 1.
-			// netty的OrderedMemoryAwareThreadPoolExecutor使用putIfAbsent因为它一个key只需要一个EventTask，EventTask里才是一个LinkList
-			// execute和run都会访问这个“链表”，netty在对LinkList，需要使用syncrnized
-			// 2.
-			// 而我的实现，在execute修改“链表”和run里面访问“链表”时，都不会出现问题，多亏map.put支持并发(原子)并且能返回旧值，另外对next的修改使用cas。
-
-			// 该操作返回的是旧值，能保证，即使并发访问execute，也不会并发出现同一个absentEventTask对象，
-			// 所以下方对它的next修改，只需考虑run里面可能有其他线程正在访问它的next，借助END对象和cas，即可处理
-
 			/*
-			 * e.g. Three event "A1","A2","A3" with the same key(keyA), are submitted in sequence, then map
-			 * keyA's value is "A3",and "A3 -> A2 -> A1"
+			 * e.g. Three event "Channel A (Event A1)","Channel A (Event A2)","Channel A (Event A3)" are submitted in sequence, then
+			 * key "Channel A" is refer to the  value of "Event A3", and "Event A3" -> "Event A2" -> "Event A1" ( linked by the field "next" in EventTask )
 			 * Every channel(as a key) has its "EventTask's LinkedList"
 			 */
 
