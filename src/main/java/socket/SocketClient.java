@@ -11,6 +11,7 @@ public class SocketClient {
     public SocketClient() {
         try {
             socket = new Socket("localhost", 6363);
+            
             InputStream inputStream = socket.getInputStream();
 
             int in;
