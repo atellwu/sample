@@ -157,7 +157,9 @@ public class FairOrderedMemoryAwareThreadPoolExecutor extends
 			// 所以下方对它的next修改，只需考虑run里面可能有其他线程正在访问它的next，借助END对象和cas，即可处理
 
 			/*
-			 * Every channel(as a key) has its "LinkedList of EventTask"
+			 * e.g. Three event "A1","A2","A3" with the same key(keyA), are submitted in sequence, then map
+			 * keyA's value is "A3",and "A3 -> A2 -> A1"
+			 * Every channel(as a key) has its "EventTask's LinkedList"
 			 */
 
 			Object key = getKey(eventRunnable.getEvent());
@@ -173,7 +175,7 @@ public class FairOrderedMemoryAwareThreadPoolExecutor extends
 					super.execute(newEventTask);
 				}
 			} else {
-				// "newEventTask" is the header of "LinkedList of EventTask"
+				// "newEventTask" is the header of "EventTask's LinkedList"
 				// so just execute it
 				super.execute(newEventTask);
 			}
@@ -228,7 +230,7 @@ public class FairOrderedMemoryAwareThreadPoolExecutor extends
 			} finally {
 				// if "next" is not null, then trigger "next" to execute;
 				// else if "next" is null, set "next" to END, means end this
-				// "LinkedList of EventTask"
+				// "EventTask's LinkedList"
 				if (!compareAndSetNext(this, null, END)) {
 					execute(next);
 				}
