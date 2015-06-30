@@ -7,7 +7,7 @@
 <!-- For professional support please see -->
 <!-- http://www.qos.ch/shop/products/professionalSupport -->
 <!-- -->
-<configuration>
+<configuration> 
     <appender name="console" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
             <pattern>[%level] %d{yyyy-MM-dd HH:mm:ss.SSS} [%X{aliUsername} %X{req.uriWithQueryString}] [%thread] %logger - %msg%n
