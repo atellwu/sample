@@ -135,7 +135,7 @@
 		<druid_version>1.0.5</druid_version>
 		<dubbo_version>2.5.3</dubbo_version>
 		<rocketmq_version>3.0.8</rocketmq_version>
-		<mybatis_version>3.2.7</mybatis_version>
+		<mybatis_version>3.5.6</mybatis_version>
 		<mybatis_spring_version>1.2.2</mybatis_spring_version>
 		<commons_dbcp_version>1.4</commons_dbcp_version>
 		<commons_codec_version>1.6</commons_codec_version>
@@ -366,7 +366,7 @@
 		<dependency>
 			<groupId>org.mybatis</groupId>
 			<artifactId>mybatis</artifactId>
-			<version>3.0.6</version>
+			<version>3.5.6</version>
 		</dependency>
 		<dependency>
 			<!-- 这是mybatis的pom中的可选依赖，我们依赖mybatis时是不会把它包括进来的，但这样，我奇怪的遇到org.apache.ibatis.session.Configuration.setLazyLoadingEnabled(boolean)抛出异常 
