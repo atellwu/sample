@@ -133,7 +133,7 @@
 		<!-- common libs -->
 		<spring_version>4.0.5.RELEASE</spring_version>
 		<druid_version>1.0.5</druid_version>
-		<dubbo_version>2.5.3</dubbo_version>
+		<dubbo_version>2.6.12</dubbo_version>
 		<rocketmq_version>3.0.8</rocketmq_version>
 		<mybatis_version>3.2.7</mybatis_version>
 		<mybatis_spring_version>1.2.2</mybatis_spring_version>
