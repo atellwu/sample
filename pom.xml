@@ -158,7 +158,7 @@
 		<saxpath_version>1.0-FCS</saxpath_version>
 		<javassist_version>3.18.0-GA</javassist_version>
 		<httpclient_version>4.3.3</httpclient_version>
-		<netty_version>4.0.19.Final</netty_version>
+		<netty_version>4.1.42.Final</netty_version>
 		<fastjson_version>1.1.40</fastjson_version>
 		<jackson_version>2.3.3</jackson_version>
 		<modelmapper_version>0.7.1</modelmapper_version>
